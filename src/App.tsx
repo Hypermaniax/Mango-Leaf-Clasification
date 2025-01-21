@@ -1,28 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, ChangeEvent, DragEvent, FormEvent } from "react";
 import { Camera, Upload, Loader2, CheckCircle, Leaf, AlertTriangle } from "lucide-react";
 
-const MangoClassification = () => {
-  
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [prediction, setPrediction] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isUploaded, setIsUploaded] = useState(false);
+// Define interfaces for type safety
+interface Prediction {
+  class: string;
+  confidence: number;
+}
+
+const MangoClassification: React.FC = () => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isUploaded, setIsUploaded] = useState<boolean>(false);
   
   const healthyRecommendations = `Rekomendasi Tindakan : berikan pupuk sesuai kebutuhan nutrisi, sesuaikan penyiraman untuk menghindari kekeringan atau genangan, potong daun rusak parah, kendalikan hama dengan pestisida alami, gunakan fungisida untuk infeksi jamur, atur pencahayaan sesuai kebutuhan tanaman, cuci daun untuk menghilangkan polutan, dan tambahkan suplemen tanaman seperti pupuk cair atau vitamin B1 untuk pemulihan.`;
 
   const unhealthyRecommendations = `Tips : Untuk menjaga daun mangga tetap sehat, sirami secara teratur tanpa genangan, berikan pupuk NPK atau organik, kendalikan hama dan penyakit, pastikan mendapat sinar matahari 6-8 jam sehari, pangkas daun tua, gunakan tanah gembur dengan drainase baik, hindari polusi, dan tambahkan suplemen seperti vitamin B1 atau pupuk cair.`;
   
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       processFile(file);
     }
   };
 
-  const processFile = (file) => {
+  const processFile = (file: File) => {
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     setPrediction(null);
@@ -31,17 +36,17 @@ const MangoClassification = () => {
     setTimeout(() => setIsUploaded(false), 1500);
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e) => {
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
@@ -50,62 +55,56 @@ const MangoClassification = () => {
     }
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedFile) {
       setError("Silakan pilih file gambar terlebih dahulu.");
       return;
     }
-  
+
     const formData = new FormData();
     formData.append("image", selectedFile);
-  
+
     setLoading(true);
     try {
       const response = await fetch(import.meta.env.VITE_API_URL, {
         method: "POST",
         body: formData,
       });
-  
-      // First check if the response is ok
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
-      // Check if the response has content
+
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         throw new Error("Server tidak mengembalikan respon JSON yang valid");
       }
-  
-      // Get the response text first
+
       const text = await response.text();
       
-      // Check if the response is empty
       if (!text) {
         throw new Error("Server mengembalikan respon kosong");
       }
-  
-      // Try to parse the JSON
-      let result;
+
+      let result: Prediction;
       try {
         result = JSON.parse(text);
       } catch (e) {
         console.error("Raw response:", text);
         throw new Error("Format JSON tidak valid dari server");
       }
-  
-      // Validate the response structure
+
       if (!result.class || typeof result.confidence !== 'number') {
         throw new Error("Format respon tidak sesuai yang diharapkan");
       }
-  
+
       setPrediction(result);
       setError(null);
-  
+
     } catch (error) {
       console.error("Error details:", error);
-      setError(error.message || "Terjadi kesalahan saat memproses gambar");
+      setError(error instanceof Error ? error.message : "Terjadi kesalahan saat memproses gambar");
       setPrediction(null);
     } finally {
       setLoading(false);
